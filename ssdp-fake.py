@@ -62,6 +62,21 @@ imsock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
 
 def notify(addr, port):
   if (URL != '' and UUID != '' and not LISTEN):
+    # Note: responses should have ST:, notifies should have NT:
+    # We include both
+
+    msg = 'NOTIFY * HTTP/1.1' + CRLF \
+	+ 'NT: urn:schemas-upnp-org:device:MediaServer:1' + CRLF \
+	+ 'USN: uuid:' + UUID + '::urn:schemas-upnp-org:device:MediaServer:1' + CRLF \
+	+ 'NTS: ssdp:alive' + CRLF \
+	+ 'LOCATION: ' + URL + CRLF \
+	+ 'HOST: 239.255.255.250:1900' + CRLF \
+	+ 'SERVER: ssdp-fake/0 DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' + CRLF \
+	+ 'CACHE-CONTROL: max-age=' + str(INTERVAL * 10) + CRLF \
+	+ CRLF
+    print "Sending ("+addr+":"+str(port)+"): \n" + msg
+    osock.sendto(msg, (addr, port))
+
     msg = 'NOTIFY * HTTP/1.1' + CRLF \
 	+ 'NT: upnp:rootdevice' + CRLF \
 	+ 'USN: uuid:' + UUID + '::upnp:rootdevice' + CRLF \
@@ -71,7 +86,7 @@ def notify(addr, port):
 	+ 'SERVER: ssdp-fake/0 DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' + CRLF \
 	+ 'CACHE-CONTROL: max-age=' + str(INTERVAL * 10) + CRLF \
 	+ CRLF
-    print "Sending: \n" + msg
+    print "Sending ("+addr+":"+str(port)+"): \n" + msg
     osock.sendto(msg, (addr, port))
 
     msg = 'NOTIFY * HTTP/1.1' + CRLF \
@@ -83,19 +98,7 @@ def notify(addr, port):
 	+ 'SERVER: ssdp-fake/0 DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' + CRLF \
 	+ 'CACHE-CONTROL: max-age=' + str(INTERVAL * 10) + CRLF \
 	+ CRLF
-    print "Sending: \n" + msg
-    osock.sendto(msg, (addr, port))
-
-    msg = 'NOTIFY * HTTP/1.1' + CRLF \
-	+ 'NT: urn:schemas-upnp-org:device:MediaServer:1' + CRLF \
-	+ 'USN: uuid:' + UUID + '::urn:schemas-upnp-org:device:MediaServer:1' + CRLF \
-	+ 'NTS: ssdp:alive' + CRLF \
-	+ 'LOCATION: ' + URL + CRLF \
-	+ 'HOST: 239.255.255.250:1900' + CRLF \
-	+ 'SERVER: ssdp-fake/0 DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' + CRLF \
-	+ 'CACHE-CONTROL: max-age=' + str(INTERVAL * 10) + CRLF \
-	+ CRLF
-    print "Sending: \n" + msg
+    print "Sending ("+addr+":"+str(port)+"): \n" + msg
     osock.sendto(msg, (addr, port))
 
     msg = 'NOTIFY * HTTP/1.1' + CRLF \
@@ -107,7 +110,7 @@ def notify(addr, port):
 	+ 'SERVER: ssdp-fake/0 DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' + CRLF \
 	+ 'CACHE-CONTROL: max-age=' + str(INTERVAL * 10) + CRLF \
 	+ CRLF
-    print "Sending: \n" + msg
+    print "Sending ("+addr+":"+str(port)+"): \n" + msg
     osock.sendto(msg, (addr, port))
 
     msg = 'NOTIFY * HTTP/1.1' + CRLF \
@@ -119,7 +122,7 @@ def notify(addr, port):
 	+ 'SERVER: ssdp-fake/0 DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' + CRLF \
 	+ 'CACHE-CONTROL: max-age=' + str(INTERVAL * 10) + CRLF \
 	+ CRLF
-    print "Sending: \n" + msg
+    print "Sending ("+addr+":"+str(port)+"): \n" + msg
     osock.sendto(msg, (addr, port))
 
     msg = 'NOTIFY * HTTP/1.1' + CRLF \
@@ -131,10 +134,89 @@ def notify(addr, port):
 	+ 'SERVER: ssdp-fake/0 DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' + CRLF \
 	+ 'CACHE-CONTROL: max-age=' + str(INTERVAL * 10) + CRLF \
 	+ CRLF
-    print "Sending: \n" + msg
+    print "Sending ("+addr+":"+str(port)+"): \n" + msg
     osock.sendto(msg, (addr, port))
   else:
     print "Skipping notification"
+
+def respond(addr, port):
+  if (URL != '' and UUID != '' and not LISTEN):
+    # Note: responses should have ST:, notifies should have NT:
+    # We include both
+
+    msg = 'HTTP/1.1 200 OK' + CRLF \
+	+ 'ST: urn:schemas-upnp-org:device:MediaServer:1' + CRLF \
+	+ 'USN: uuid:' + UUID + '::urn:schemas-upnp-org:device:MediaServer:1' + CRLF \
+	+ 'NTS: ssdp:alive' + CRLF \
+	+ 'LOCATION: ' + URL + CRLF \
+	+ 'HOST: 239.255.255.250:1900' + CRLF \
+	+ 'SERVER: ssdp-fake/0 DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' + CRLF \
+	+ 'CACHE-CONTROL: max-age=' + str(INTERVAL * 10) + CRLF \
+	+ CRLF
+    print "Sending ("+addr+":"+str(port)+"): \n" + msg
+    osock.sendto(msg, (addr, port))
+
+    msg = 'HTTP/1.1 200 OK' + CRLF \
+	+ 'ST: upnp:rootdevice' + CRLF \
+	+ 'USN: uuid:' + UUID + '::upnp:rootdevice' + CRLF \
+	+ 'NTS: ssdp:alive' + CRLF \
+	+ 'LOCATION: ' + URL + CRLF \
+	+ 'HOST: 239.255.255.250:1900' + CRLF \
+	+ 'SERVER: ssdp-fake/0 DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' + CRLF \
+	+ 'CACHE-CONTROL: max-age=' + str(INTERVAL * 10) + CRLF \
+	+ CRLF
+    print "Sending ("+addr+":"+str(port)+"): \n" + msg
+    osock.sendto(msg, (addr, port))
+
+    msg = 'HTTP/1.1 200 OK' + CRLF \
+	+ 'ST: uuid:' + UUID + CRLF \
+	+ 'USN: uuid:' + UUID + CRLF \
+	+ 'NTS: ssdp:alive' + CRLF \
+	+ 'LOCATION: ' + URL + CRLF \
+	+ 'HOST: 239.255.255.250:1900' + CRLF \
+	+ 'SERVER: ssdp-fake/0 DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' + CRLF \
+	+ 'CACHE-CONTROL: max-age=' + str(INTERVAL * 10) + CRLF \
+	+ CRLF
+    print "Sending ("+addr+":"+str(port)+"): \n" + msg
+    osock.sendto(msg, (addr, port))
+
+    msg = 'HTTP/1.1 200 OK' + CRLF \
+	+ 'ST: urn:schemas-upnp-org:service:ContentDirectory:1' + CRLF \
+	+ 'USN: uuid:' + UUID + '::urn:schemas-upnp-org:service:ContentDirectory:1' + CRLF \
+	+ 'NTS: ssdp:alive' + CRLF \
+	+ 'LOCATION: ' + URL + CRLF \
+	+ 'HOST: 239.255.255.250:1900' + CRLF \
+	+ 'SERVER: ssdp-fake/0 DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' + CRLF \
+	+ 'CACHE-CONTROL: max-age=' + str(INTERVAL * 10) + CRLF \
+	+ CRLF
+    print "Sending ("+addr+":"+str(port)+"): \n" + msg
+    osock.sendto(msg, (addr, port))
+
+    msg = 'HTTP/1.1 200 OK' + CRLF \
+	+ 'ST: urn:schemas-upnp-org:service:ConnectionManager:1' + CRLF \
+	+ 'USN: uuid:' + UUID + '::urn:schemas-upnp-org:service:ConnectionManager:1' + CRLF \
+	+ 'NTS: ssdp:alive' + CRLF \
+	+ 'LOCATION: ' + URL + CRLF \
+	+ 'HOST: 239.255.255.250:1900' + CRLF \
+	+ 'SERVER: ssdp-fake/0 DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' + CRLF \
+	+ 'CACHE-CONTROL: max-age=' + str(INTERVAL * 10) + CRLF \
+	+ CRLF
+    print "Sending ("+addr+":"+str(port)+"): \n" + msg
+    osock.sendto(msg, (addr, port))
+
+    msg = 'HTTP/1.1 200 OK' + CRLF \
+	+ 'ST: urn:schemas-upnp-org:service:X_MS_MediaReceiverRegistrar:1' + CRLF \
+	+ 'USN: uuid:' + UUID + '::urn:schemas-upnp-org:service:X_MS_MediaReceiverRegistrar:1' + CRLF \
+	+ 'NTS: ssdp:alive' + CRLF \
+	+ 'LOCATION: ' + URL + CRLF \
+	+ 'HOST: 239.255.255.250:1900' + CRLF \
+	+ 'SERVER: ssdp-fake/0 DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' + CRLF \
+	+ 'CACHE-CONTROL: max-age=' + str(INTERVAL * 10) + CRLF \
+	+ CRLF
+    print "Sending ("+addr+":"+str(port)+"): \n" + msg
+    osock.sendto(msg, (addr, port))
+  else:
+    print "Skipping response"
 
 def server():
   if not LISTEN:
@@ -192,7 +274,7 @@ while True:
     print "Received unicast from %s:%d\n%s" % (addr, port, msg)
     parse_msg(msg)
     if (is_search(msg)):
-      notify(addr, port)
+      respond(addr, port)
 
   if (imsock in readyin):
     (msg, (addr, port)) = imsock.recvfrom(4096)
@@ -202,7 +284,7 @@ while True:
       print "Received multicast from %s:%d\n%s" % (addr, port, msg)
       parse_msg(msg)
       if (is_search(msg)):
-        notify(addr, port)
+        respond(addr, port)
 
   if (time.time() >= next_notification):
     next_notification = time.time() + INTERVAL
