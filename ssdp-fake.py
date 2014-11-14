@@ -11,7 +11,7 @@ import select
 import re
 from optparse import OptionParser
 
-VERSION='0.2'
+VERSION='0.3'
 
 DLNA_GRP = '239.255.255.250'
 DLNA_PORT = 1900
@@ -168,6 +168,8 @@ def parse_msg(msg):
     # Bring the notifcation forward
     next_notification = time.time() + 1
     
+def is_search(msg):
+  return re.match('^M-SEARCH', msg, re.IGNORECASE)
 
 # Get info from server
 last_update = 0
@@ -189,6 +191,8 @@ while True:
     (msg, (addr, port)) = isock.recvfrom(4096)
     print "Received unicast from %s:%d\n%s" % (addr, port, msg)
     parse_msg(msg)
+    if (is_search(msg)):
+      notify(addr, port)
 
   if (imsock in readyin):
     (msg, (addr, port)) = imsock.recvfrom(4096)
@@ -197,8 +201,8 @@ while True:
     else:
       print "Received multicast from %s:%d\n%s" % (addr, port, msg)
       parse_msg(msg)
-      if (port != DLNA_PORT):
-        notify(addr, port);
+      if (is_search(msg)):
+        notify(addr, port)
 
   if (time.time() >= next_notification):
     next_notification = time.time() + INTERVAL
