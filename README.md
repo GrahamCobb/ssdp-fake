@@ -11,25 +11,16 @@ accessible by both UDP and TCP.
 It works by sending a unicast request to the server (you have to know the IP address of
 the server), picking the URL from the response, and then sending out local multicast
 announcements for the server.  It is very simple: it sends all the multicast
-announcements whenever it sees any traffic to the multicast address, or periodically.
+announcements periodically, and it sends all the responses whenever it sees a search.
 
-Note: all it handles is the NOTIFY.  The client then uses the URL to contact the server
-directly.
+Note: all this handles is the discovery.  The client then uses the URL to contact the 
+server directly.
 
 ## Versions
 
 There are two files: a Python version (`ssdp-fake.py`) and a Perl version
 (`ssdp-fake`).  At the moment, the python version is more recent -- but check
 the dates to see if that is still true when you read this!
-
-## Bugs
-
-The most serious bug is that if you have two of these on the same LAN, they will
-probably cause a multicast storm, because each one sends out several announcements
-whenever it sees any traffic to the multicast address.
-
-I told you it is a hack.  Hopefully that bug will be fixed soon by making it pay
-more attention to what it sees.
 
 ## Real Solution
 
