@@ -37,3 +37,8 @@ The real solution to this problem, would be a real SSDP proxy, which would colle
 announcements from one LAN, forward them to a program on another LAN which would manage
 the announcements on that LAN.  Apparently this is harder than it seems, because
 I am aware that this has been looked into but I don't know of any solutions.
+
+## Credits
+Python multicast code taken from Stack Overflow (https://stackoverflow.com/questions/603852/multicast-in-python/1794373#1794373) by tolomea (https://stackoverflow.com/users/10471/tolomea)
+
+Other example code taken from Stack Overflow by Toddeman, however it does not seem to be available any longer
