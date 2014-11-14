@@ -1,0 +1,136 @@
+#!/usr/bin/perl
+# Copyright (C) 2014 Graham R. Cobb
+# Released under GPL V2 -- see LICENSE
+# Not sure where I got the original for this from.  If you know please tell me.
+use strict;
+use warnings;
+
+use constant SSDPADDR => '239.255.255.250';
+use constant SSDPPORT => 1900;
+use constant SSDPPEER => SSDPADDR . ':' . SSDPPORT;
+
+use constant CRLF => "\015\012";
+
+use constant UUID => '4d696e69-444c-164e-9d41-c03f0ea4ef10';
+use constant URL => 'http://nas.home.cobb.me.uk:8200/rootDesc.xml';
+
+use constant INTERVAL => 60;
+
+use IO::Socket::Multicast;
+use IO::Select;
+
+sub process($) {
+    my ($data) = @_;
+    print $data, "\n";
+}
+
+my $sout = IO::Socket::Multicast->new(Proto => 'udp',
+                  PeerAddr => SSDPPEER,
+                  ReuseAddr => 1);
+$sout->mcast_loopback(1);
+
+my $sinm = IO::Socket::Multicast->new(Proto => 'udp',
+		  LocalPort => SSDPPORT,
+                  ReuseAddr => 1);
+$sinm->mcast_add(SSDPADDR);
+
+my $mysock = $sout->sockname;
+my ($myport) = sockaddr_in($mysock);
+
+my $sin = IO::Socket::INET->new(Proto => 'udp',
+            LocalPort => $myport,
+            ReuseAddr => 1)
+       || die "Can't make socket: $!\n";
+
+sub notify() {
+    my $msg = 'NOTIFY * HTTP/1.1' . CRLF
+	. 'NT:upnp:rootdevice' . CRLF
+	. 'USN:uuid:' . UUID . '::upnp:rootdevice' . CRLF
+	. 'NTS:ssdp:alive' . CRLF
+	. 'LOCATION:' . URL . CRLF
+	. 'HOST:239.255.255.250:1900' . CRLF
+	. 'SERVER:ssdp-fake/0 DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' . CRLF
+	. 'CACHE-CONTROL:max-age=' . INTERVAL * 30 . CRLF . CRLF;
+    print "Sending: \n", $msg;
+    $sout->send($msg) || die "Can't send notify: $!\n";
+
+    $msg = 'NOTIFY * HTTP/1.1' . CRLF
+	. 'NT:uuid:' . UUID . CRLF
+	. 'USN:uuid:' . UUID . CRLF
+	. 'NTS:ssdp:alive' . CRLF
+	. 'LOCATION:' . URL . CRLF
+	. 'HOST:239.255.255.250:1900' . CRLF
+	. 'SERVER:ssdp-fake/0 DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' . CRLF
+	. 'CACHE-CONTROL:max-age=' . INTERVAL * 30 . CRLF . CRLF;
+    print "Sending: \n", $msg;
+    $sout->send($msg) || die "Can't send notify: $!\n";
+
+    $msg = 'NOTIFY * HTTP/1.1' . CRLF
+	. 'NT:urn:schemas-upnp-org:device:MediaServer:1' . CRLF
+	. 'USN:uuid:' . UUID . '::urn:schemas-upnp-org:device:MediaServer:1' . CRLF
+	. 'NTS:ssdp:alive' . CRLF
+	. 'LOCATION:' . URL . CRLF
+	. 'HOST:239.255.255.250:1900' . CRLF
+	. 'SERVER:ssdp-fake/0 DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' . CRLF
+	. 'CACHE-CONTROL:max-age=' . INTERVAL * 30 . CRLF . CRLF;
+    print "Sending: \n", $msg;
+    $sout->send($msg) || die "Can't send notify: $!\n";
+
+    $msg = 'NOTIFY * HTTP/1.1' . CRLF
+	. 'NT:urn:schemas-upnp-org:service:ContentDirectory:1' . CRLF
+	. 'USN:uuid:' . UUID . '::urn:schemas-upnp-org:service:ContentDirectory:1' . CRLF
+	. 'NTS:ssdp:alive' . CRLF
+	. 'LOCATION:' . URL . CRLF
+	. 'HOST:239.255.255.250:1900' . CRLF
+	. 'SERVER:ssdp-fake/0 DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' . CRLF
+	. 'CACHE-CONTROL:max-age=' . INTERVAL * 30 . CRLF . CRLF;
+    print "Sending: \n", $msg;
+    $sout->send($msg) || die "Can't send notify: $!\n";
+
+    $msg = 'NOTIFY * HTTP/1.1' . CRLF
+	. 'NT:urn:schemas-upnp-org:service:ConnectionManager:1' . CRLF
+	. 'USN:uuid:' . UUID . '::urn:schemas-upnp-org:service:ConnectionManager:1' . CRLF
+	. 'NTS:ssdp:alive' . CRLF
+	. 'LOCATION:' . URL . CRLF
+	. 'HOST:239.255.255.250:1900' . CRLF
+	. 'SERVER:ssdp-fake/0 DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' . CRLF
+	. 'CACHE-CONTROL:max-age=' . INTERVAL * 30 . CRLF . CRLF;
+    print "Sending: \n", $msg;
+    $sout->send($msg) || die "Can't send notify: $!\n";
+
+    $msg = 'NOTIFY * HTTP/1.1' . CRLF
+	. 'NT:urn:schemas-upnp-org:service:X_MS_MediaReceiverRegistrar:1' . CRLF
+	. 'USN:uuid:' . UUID . '::urn:schemas-upnp-org:service:X_MS_MediaReceiverRegistrar:1' . CRLF
+	. 'NTS:ssdp:alive' . CRLF
+	. 'LOCATION:' . URL . CRLF
+	. 'HOST:239.255.255.250:1900' . CRLF
+	. 'SERVER:ssdp-fake/0 DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' . CRLF
+	. 'CACHE-CONTROL:max-age=' . INTERVAL * 30 . CRLF . CRLF;
+    print "Sending: \n", $msg;
+    $sout->send($msg) || die "Can't send notify: $!\n";
+}
+
+notify();
+my $last_notification = time();
+
+my $sel = IO::Select->new;
+$sel->add($sin);
+$sel->add($sinm);
+
+while (1) {
+    my @ready = $sel->can_read(INTERVAL);
+    foreach my $fh (@ready) {
+	if($fh == $sin) {
+	    my $data;
+	    process($data) if(defined $sin->recv($data, 1024));
+	}
+	if($fh == $sinm) {
+	    my $data;
+	    process($data) if(defined $sinm->recv($data, 1024));
+	}
+    }
+    if (time() >= $last_notification + INTERVAL) {
+	notify();
+	$last_notification = time();
+    }
+}
