@@ -245,10 +245,6 @@ def parse_msg(msg):
     last_update = time.time()
     # Bring the notifcation forward
     next_notification = time.time() + 1
-
-  elif (re.match('^M-SEARCH', msg, re.IGNORECASE)):
-    # Bring the notifcation forward
-    next_notification = time.time() + 1
     
 def is_search(msg):
   return re.match('^M-SEARCH', msg, re.IGNORECASE)
@@ -272,9 +268,10 @@ while True:
   if (isock in readyin):
     (msg, (addr, port)) = isock.recvfrom(4096)
     print "Received unicast from %s:%d\n%s" % (addr, port, msg)
-    parse_msg(msg)
     if (is_search(msg)):
       respond(addr, port)
+    else:
+      parse_msg(msg)
 
   if (imsock in readyin):
     (msg, (addr, port)) = imsock.recvfrom(4096)
@@ -282,7 +279,6 @@ while True:
       print "Ignored multicast from ourselves (%s:%d)" % (addr, port)
     else:
       print "Received multicast from %s:%d\n%s" % (addr, port, msg)
-      parse_msg(msg)
       if (is_search(msg)):
         respond(addr, port)
 
