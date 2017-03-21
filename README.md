@@ -19,10 +19,24 @@ server directly.
 ## Versions
 
 There are two files: a Python version (`ssdp-fake.py`) and a Perl version
-(`ssdp-fake`).  At the moment, the python version is more recent -- but check
+(`ssdp-fake`).  At the moment, they are at roughly the same functional level but
+the perl version is the most recent and is in daily use. But check
 the dates to see if that is still true when you read this!
 
 ## Usage
+
+### Perl version
+
+```
+ssdp-fake --listen-only
+
+ssdp-fake [--interface <ifname-or-ip-address>]... [--timer N] server.ip.address
+```
+
+Not specifying an interface should send announcements on all interfaces.
+Or one or more interfaces can be specified to confine the announcements to those interfaces.
+
+### Python version
 
 ```
 ssdp-fake.py --help
@@ -34,6 +48,20 @@ ssdp-fake.py --all [--interval=N] server.ip.address
 
 `--all` is recommended. Leaving it out is supposed to confine the announcements to the loopback
 interface so only clients on the same host will see the server, but it doesn't work properly.
+
+## TODO
+
+### Multiple servers
+
+It would be nice to be able to list multiple servers and have them all announced.
+At the moment, the code only handles a single server but it is possible to run multiple copies
+on the same system to announce for multiple servers.
+
+### Different types of servers
+
+At the moment the announcements bear little relationship to what the server is actually offering:
+they always offer a Media Server. It would be nice to actually parse the response from the server and
+set the correct announcements.
 
 ## Real Solution
 
