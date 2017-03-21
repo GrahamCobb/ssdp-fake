@@ -4,9 +4,12 @@
 # Not sure where I got the original for this from.  If you know please tell me.
 use strict;
 use warnings;
+use Getopt::Long 2.33 qw(:config gnu_getopt auto_help auto_version);
+# Pod not used as not enough space on router
+#use Pod::Usage;
 use List::Util qw[max];
 
-use constant VERSION => '0.3';
+use constant VERSION => '0.4';
 
 use constant SSDPADDR => '239.255.255.250';
 use constant SSDPPORT => 1900;
@@ -14,8 +17,6 @@ use constant SSDPPEER => SSDPADDR . ':' . SSDPPORT;
 
 use constant CRLF => "\015\012";
 
-#use constant UUID => '4d696e69-444c-164e-9d41-c03f0ea4ef10';
-#use constant URL => 'http://nas.home.cobb.me.uk:8200/rootDesc.xml';
 my ($uuid, $url);
 my $last_update = 0;
 my $next_notification = 0;
@@ -23,14 +24,69 @@ my $next_notification = 0;
 use IO::Socket::Multicast;
 use IO::Select;
 
-# Options
-# --listen-only
+#
+# Logging
+#
+my $verbosity = 2;
+sub msgError
+{
+    print @_,"\n";
+}
+sub msgInfo
+{
+    print @_,"\n" if $verbosity >= 1;
+}
+sub msgProgress
+{
+    print @_,"\n" if $verbosity >= 2;
+}
+sub msgDebug
+{
+    print @_,"\n" if $verbosity >= 3;
+}
+# Autoflush output, otherwise errors appear in wrong place relative to logging
+$| = 1;
+
+#
+# Option processing
+#
 my $listen = 0;
-# --interval
 my $interval = 60;
-my $server = "nas";
-my $server_ip = inet_aton($server);
 my @interfaces = ();
+my $dryRun = 0;
+my $man = 0;
+#Getopt::Long::Configure ("bundling");
+if (!GetOptions(
+	   "listen-only|l" => \$listen,
+	   "timer|t=i" => \$interval,
+	   "interface|i=s" => \@interfaces,
+	   "dry-run|n" => \$dryRun,
+	   "verbose|v:+" => \$verbosity,
+	   "man" => \$man,
+	   )) {
+    msgError("Usage: ssdp-fake [--listen-only] [--timer=<seconds>] [--interface=<address>]... [--verbose]... <server-host>");
+    exit;
+}
+msgDebug "man = $man";
+#if ($man) {
+#    pod2usage(-verbose => 2);
+#    exit;
+#}
+my ($server) = @ARGV;
+if (! $server) {
+    msgError "Server name missing";
+#    pod2usage(2);
+    exit;
+}
+my $server_ip = inet_aton($server);
+
+msgDebug "verbosity = $verbosity";
+msgDebug "server = $server";
+msgDebug "server IP = $server_ip";
+msgDebug "listen = $listen";
+msgDebug "interval = $interval";
+msgDebug "interaces = @interfaces";
+msgDebug "dryRun = $dryRun";
 
 
 # Multicast sending socket
@@ -63,7 +119,7 @@ sub respond {
     my ($addr, $port) = @_;
     my $to = pack_sockaddr_in($port, $addr);
     if ((not defined $url) || (not defined $uuid) || $listen) {
-	print "Skipping notification\n";
+	msgError "Skipping notification";
 	return;
     }
 
@@ -76,7 +132,7 @@ sub respond {
 	. 'HOST: 239.255.255.250:1900' . CRLF
 	. 'SERVER: ssdp-fake/' . VERSION . ' DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' . CRLF
 	. 'CACHE-CONTROL: max-age=' . ($interval * 10) . CRLF . CRLF;
-    print "Sending (".inet_ntoa($addr).":$port):\n", $msg;
+    msgInfo "Sending (".inet_ntoa($addr).":$port):\n", $msg;
     $sout->send($msg,0,$to) || die "Can't send notify: $!\n";
 
     $msg = 'NOTIFY * HTTP/1.1' . CRLF
@@ -87,7 +143,7 @@ sub respond {
 	. 'HOST: 239.255.255.250:1900' . CRLF
 	. 'SERVER: ssdp-fake/' . VERSION . ' DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' . CRLF
 	. 'CACHE-CONTROL: max-age=' . ($interval * 10) . CRLF . CRLF;
-    print "Sending (".inet_ntoa($addr).":$port):\n", $msg;
+    msgInfo "Sending (".inet_ntoa($addr).":$port):\n", $msg;
     $sout->send($msg,0,$to) || die "Can't send notify: $!\n";
 
     $msg = 'NOTIFY * HTTP/1.1' . CRLF
@@ -98,7 +154,7 @@ sub respond {
 	. 'HOST: 239.255.255.250:1900' . CRLF
 	. 'SERVER: ssdp-fake/' . VERSION . ' DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' . CRLF
 	. 'CACHE-CONTROL: max-age=' . ($interval * 10) . CRLF . CRLF;
-    print "Sending (".inet_ntoa($addr).":$port):\n", $msg;
+    msgInfo "Sending (".inet_ntoa($addr).":$port):\n", $msg;
     $sout->send($msg,0,$to) || die "Can't send notify: $!\n";
 
     $msg = 'NOTIFY * HTTP/1.1' . CRLF
@@ -120,7 +176,7 @@ sub respond {
 	. 'HOST: 239.255.255.250:1900' . CRLF
 	. 'SERVER: ssdp-fake/' . VERSION . ' DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' . CRLF
 	. 'CACHE-CONTROL: max-age=' . ($interval * 10) . CRLF . CRLF;
-    print "Sending (".inet_ntoa($addr).":$port):\n", $msg;
+    msgInfo "Sending (".inet_ntoa($addr).":$port):\n", $msg;
     $sout->send($msg,0,$to) || die "Can't send notify: $!\n";
 
     $msg = 'NOTIFY * HTTP/1.1' . CRLF
@@ -131,7 +187,7 @@ sub respond {
 	. 'HOST: 239.255.255.250:1900' . CRLF
 	. 'SERVER: ssdp-fake/' . VERSION . ' DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' . CRLF
 	. 'CACHE-CONTROL: max-age=' . ($interval * 10) . CRLF . CRLF;
-    print "Sending (".inet_ntoa($addr).":$port):\n", $msg;
+    msgInfo "Sending (".inet_ntoa($addr).":$port):\n", $msg;
     $sout->send($msg,0,$to) || die "Can't send notify: $!\n";
 }
 
@@ -139,7 +195,7 @@ sub notify {
     my ($addr, $port) = @_;
     my $to = pack_sockaddr_in($port, $addr);
     if ((not defined $url) || (not defined $uuid) || $listen) {
-	print "Skipping notification\n";
+	msgError "Skipping notification\n";
 	return;
     }
 
@@ -152,7 +208,7 @@ sub notify {
 	. 'HOST: 239.255.255.250:1900' . CRLF
 	. 'SERVER: ssdp-fake/' . VERSION . ' DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' . CRLF
 	. 'CACHE-CONTROL: max-age=' . ($interval * 10) . CRLF . CRLF;
-    print "Sending (".inet_ntoa($addr).":$port):\n", $msg;
+    msgInfo "Sending (".inet_ntoa($addr).":$port):\n", $msg;
     $sout->send($msg,0,$to) || die "Can't send notify: $!\n";
 
     $msg = 'NOTIFY * HTTP/1.1' . CRLF
@@ -163,7 +219,7 @@ sub notify {
 	. 'HOST: 239.255.255.250:1900' . CRLF
 	. 'SERVER: ssdp-fake/' . VERSION . ' DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' . CRLF
 	. 'CACHE-CONTROL: max-age=' . ($interval * 10) . CRLF . CRLF;
-    print "Sending (".inet_ntoa($addr).":$port):\n", $msg;
+    msgInfo "Sending (".inet_ntoa($addr).":$port):\n", $msg;
     $sout->send($msg,0,$to) || die "Can't send notify: $!\n";
 
     $msg = 'NOTIFY * HTTP/1.1' . CRLF
@@ -174,7 +230,7 @@ sub notify {
 	. 'HOST: 239.255.255.250:1900' . CRLF
 	. 'SERVER: ssdp-fake/' . VERSION . ' DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' . CRLF
 	. 'CACHE-CONTROL: max-age=' . ($interval * 10) . CRLF . CRLF;
-    print "Sending (".inet_ntoa($addr).":$port):\n", $msg;
+    msgInfo "Sending (".inet_ntoa($addr).":$port):\n", $msg;
     $sout->send($msg,0,$to) || die "Can't send notify: $!\n";
 
     $msg = 'NOTIFY * HTTP/1.1' . CRLF
@@ -185,7 +241,7 @@ sub notify {
 	. 'HOST: 239.255.255.250:1900' . CRLF
 	. 'SERVER: ssdp-fake/' . VERSION . ' DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' . CRLF
 	. 'CACHE-CONTROL: max-age=' . ($interval * 10) . CRLF . CRLF;
-    print "Sending (".inet_ntoa($addr).":$port):\n", $msg;
+    msgInfo "Sending (".inet_ntoa($addr).":$port):\n", $msg;
     $sout->send($msg,0,$to) || die "Can't send notify: $!\n";
 
     $msg = 'NOTIFY * HTTP/1.1' . CRLF
@@ -196,7 +252,7 @@ sub notify {
 	. 'HOST: 239.255.255.250:1900' . CRLF
 	. 'SERVER: ssdp-fake/' . VERSION . ' DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' . CRLF
 	. 'CACHE-CONTROL: max-age=' . ($interval * 10) . CRLF . CRLF;
-    print "Sending (".inet_ntoa($addr).":$port):\n", $msg;
+    msgInfo "Sending (".inet_ntoa($addr).":$port):\n", $msg;
     $sout->send($msg,0,$to) || die "Can't send notify: $!\n";
 
     $msg = 'NOTIFY * HTTP/1.1' . CRLF
@@ -207,7 +263,7 @@ sub notify {
 	. 'HOST: 239.255.255.250:1900' . CRLF
 	. 'SERVER: ssdp-fake/' . VERSION . ' DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' . CRLF
 	. 'CACHE-CONTROL: max-age=' . ($interval * 10) . CRLF . CRLF;
-    print "Sending (".inet_ntoa($addr).":$port):\n", $msg;
+    msgInfo "Sending (".inet_ntoa($addr).":$port):\n", $msg;
     $sout->send($msg,0,$to) || die "Can't send notify: $!\n";
 }
 
@@ -220,7 +276,7 @@ sub server {
 	. 'ST: upnp:rootdevice' . CRLF
 	. 'MX: 3' . CRLF
 	. 'User-Agent: ssdp-fake/' . VERSION . ' DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' . CRLF . CRLF;
-    print "Sending to server $server:\n", $msg;
+    msgInfo "Sending to server $server:\n", $msg;
     my $to = pack_sockaddr_in(SSDPPORT, $server_ip);
     $sout->send($msg, 0, $to) || die "Can't send server request: $!\n";
 }
@@ -233,7 +289,7 @@ sub parse_msg {
     # We have a response to our M-SEARCH
     ($url) = ($msg =~ /^LOCATION:\s*(.*)\r$/im);
     ($uuid) = ($msg =~ /^USN:\s*uuid:([^:]+):/im);
-    print "URL=$url, UUID=$uuid\n";
+    msgProgress "URL=$url, UUID=$uuid";
     $last_update = time();
     # Bring notification forward
     $next_notification = time() + 1;
@@ -252,7 +308,7 @@ $next_notification = time() + $interval;
 # Note: our sending port is not assigned until at least one send has happened
 my $mysock = $sout->sockname;
 my ($myport) = unpack_sockaddr_in($mysock);
-print "My port is $myport\n";
+msgDebug "My port is $myport";
 
 # Unicast receive socket
 my $sin = IO::Socket::INET->new(Proto => 'udp',
@@ -272,7 +328,7 @@ while (1) {
 	    $from = $sin->recv($data, 4096);
 	    if (defined($from)) {
 		($port, $addr) = unpack_sockaddr_in($from);
-		print "Received unicast from " . inet_ntoa($addr) . ":$port: $data\n";
+		msgInfo "Received unicast from " . inet_ntoa($addr) . ":$port: $data";
 		if (is_search($data)) {
 		    respond($addr, $port);
 		} else {
@@ -286,9 +342,9 @@ while (1) {
 	    if (defined($from)) {
 		($port, $addr) = unpack_sockaddr_in($from);
 		if ($port == $myport) {
-		    print "Ignored multicast from ourselves (".inet_ntoa($addr).":$port)\n";
+		    msgProgress "Ignored multicast from ourselves (".inet_ntoa($addr).":$port)";
 		} else {
-		    print "Received multicast from ".inet_ntoa($addr).":$port\n", $data, "\n";
+		    msgProgress "Received multicast from ".inet_ntoa($addr).":$port\n", $data;
 		    respond($addr, $port) if is_search($data);
 		}
 	    }
