@@ -72,17 +72,21 @@ msgDebug "man = $man";
 #    pod2usage(-verbose => 2);
 #    exit;
 #}
-my ($server) = @ARGV;
-if (! $server) {
-    msgError "Server name missing";
-#    pod2usage(2);
-    exit;
+my $server;
+my $serverIp;
+if (! $listen) {
+    ($server) = @ARGV;
+    if (! $server) {
+	msgError "Server name missing";
+	#    pod2usage(2);
+	exit;
+    }
+    $serverIp = inet_aton($server);
 }
-my $server_ip = inet_aton($server);
 
 msgDebug "verbosity = $verbosity";
-msgDebug "server = $server";
-msgDebug "server IP = $server_ip";
+msgDebug "server = ", $server ? $server : '';
+msgDebug "serverIP = ", $serverIp ? inet_ntoa($serverIp) : '';
 msgDebug "listen = $listen";
 msgDebug "interval = $interval";
 msgDebug "interaces = @interfaces";
@@ -268,6 +272,8 @@ sub notify {
 }
 
 sub server {
+    my ($server, $serverIp) = @_;
+    
     return if $listen;
 
     my $msg = 'M-SEARCH * HTTP/1.1' . CRLF
@@ -277,7 +283,7 @@ sub server {
 	. 'MX: 3' . CRLF
 	. 'User-Agent: ssdp-fake/' . VERSION . ' DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' . CRLF . CRLF;
     msgInfo "Sending to server $server:\n", $msg;
-    my $to = pack_sockaddr_in(SSDPPORT, $server_ip);
+    my $to = pack_sockaddr_in(SSDPPORT, $serverIp);
     $sout->send($msg, 0, $to) || die "Can't send server request: $!\n";
 }
 
@@ -301,7 +307,7 @@ sub is_search {
 }
 
 # Get info from server
-server();
+server($server, $serverIp) unless $listen;
 
 $next_notification = time() + $interval;
 
@@ -358,7 +364,7 @@ while (1) {
 	    notify(inet_aton(SSDPADDR), SSDPPORT);
 	} else {
 	    # Get new info from the server
-	    server();
+	    server($server, $serverIp) unless $listen;
 	}
     }
 }
