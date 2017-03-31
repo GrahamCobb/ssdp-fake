@@ -30,10 +30,20 @@ the dates to see if that is still true when you read this!
 ```
 ssdp-fake --listen-only
 
-ssdp-fake [--interface <ifname-or-ip-address>]... [--timer N] server.ip.address
+ssdp-fake [--interface <ifname-or-ip-address>]... [--timer N] servername-or-address
+
+ssdp-fake [--interface <ifname-or-ip-address>]... [--timer N] server-url server-UUID
 ```
 
-Not specifying an interface should send announcements on all interfaces.
+Specifying the server name or address is preferred. In this case, the URL and UUID
+will be fetched from the server, and the announcements will only be made if the server
+is responding.
+
+The last command line maually configures the server information to send.
+In this case, the server is not contacted at all and the announcements are made
+without any checks on whether the server is actually available.
+
+Not specifying an interface should send announcements on all interfaces (although it is not clear this works on all systems).
 Or one or more interfaces can be specified to confine the announcements to those interfaces.
 
 ### Python version
@@ -79,7 +89,7 @@ Python multicast code taken from Stack Overflow (https://stackoverflow.com/quest
 Other example code taken from Stack Overflow by Toddeman, however it does not seem to be available any longer
 
 ## Notices
-Copyright (c) 2014 Graham R. Cobb.
+Copyright (c) 2014-2017 Graham R. Cobb.
 This software is distributed under the GPL (see the copyright notices and the LICENSE file).
 
 `ssdp-fake` is free software; you can redistribute it and/or modify

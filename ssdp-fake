@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-# Copyright (C) 2014 Graham R. Cobb
+# Copyright (C) 2014-2017 Graham R. Cobb
 # Released under GPL V2 -- see LICENSE
 # Not sure where I got the original for this from.  If you know please tell me.
 use strict;
@@ -54,14 +54,12 @@ my $manual = 0;
 my $listen = 0;
 my $interval = 60;
 my @interfaces = ();
-my $dryRun = 0;
 my $man = 0;
 #Getopt::Long::Configure ("bundling");
 if (!GetOptions(
 	   "listen-only|l" => \$listen,
 	   "timer|t=i" => \$interval,
 	   "interface|i=s" => \@interfaces,
-	   "dry-run|n" => \$dryRun,
 	   "verbose|v:+" => \$verbosity,
 	   "man" => \$man,
 	   )) {
@@ -93,7 +91,6 @@ msgDebug "listen = $listen";
 msgDebug "manual = $manual";
 msgDebug "interval = $interval";
 msgDebug "interaces = @interfaces";
-msgDebug "dryRun = $dryRun";
 
 
 # Multicast sending socket
