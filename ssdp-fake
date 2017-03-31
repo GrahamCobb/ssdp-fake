@@ -17,7 +17,7 @@ use constant SSDPPEER => SSDPADDR . ':' . SSDPPORT;
 
 use constant CRLF => "\015\012";
 
-my ($uuid, $url);
+my ($uuid, $url, $server, $serverIp);
 my $last_update = 0;
 my $next_notification = 0;
 
@@ -50,6 +50,7 @@ $| = 1;
 #
 # Option processing
 #
+my $manual = 0;
 my $listen = 0;
 my $interval = 60;
 my @interfaces = ();
@@ -64,7 +65,7 @@ if (!GetOptions(
 	   "verbose|v:+" => \$verbosity,
 	   "man" => \$man,
 	   )) {
-    msgError("Usage: ssdp-fake [--listen-only] [--timer=<seconds>] [--interface=<address>]... [--verbose]... <server-host>");
+    msgError("Usage: ssdp-fake [--listen-only] [--timer=<seconds>] [--interface=<address>]... [--verbose]... <server-host> | <url> <uuid>");
     exit;
 }
 msgDebug "man = $man";
@@ -72,22 +73,24 @@ msgDebug "man = $man";
 #    pod2usage(-verbose => 2);
 #    exit;
 #}
-my $server;
-my $serverIp;
 if (! $listen) {
-    ($server) = @ARGV;
-    if (! $server) {
-	msgError "Server name missing";
-	#    pod2usage(2);
-	exit;
+    if (@ARGV > 1) {
+	# Information manually configured
+	($url, $uuid) = @ARGV;
+	$manual = 1;
+    } else {
+	$server = shift or die "Server name missing";
+	$serverIp = inet_aton($server);
     }
-    $serverIp = inet_aton($server);
 }
 
 msgDebug "verbosity = $verbosity";
 msgDebug "server = ", $server ? $server : '';
 msgDebug "serverIP = ", $serverIp ? inet_ntoa($serverIp) : '';
+msgDebug "url = ", $url ? $url : ''; 
+msgDebug "uuid = ", $uuid ? $uuid : ''; 
 msgDebug "listen = $listen";
+msgDebug "manual = $manual";
 msgDebug "interval = $interval";
 msgDebug "interaces = @interfaces";
 msgDebug "dryRun = $dryRun";
@@ -273,9 +276,6 @@ sub notify {
 
 sub server {
     my ($server, $serverIp) = @_;
-    
-    return if $listen;
-
     my $msg = 'M-SEARCH * HTTP/1.1' . CRLF
 	. 'Host: ' . $server . ':' . SSDPPORT . CRLF
 	. 'Man: "ssdp:discover"' . CRLF
@@ -307,7 +307,7 @@ sub is_search {
 }
 
 # Get info from server
-server($server, $serverIp) unless $listen;
+server($server, $serverIp) if $server;
 
 $next_notification = time() + $interval;
 
@@ -359,12 +359,12 @@ while (1) {
     if (time() >= $next_notification) {
 	$next_notification = time() + $interval;
 	# Has the server info been updated recently?
-	if (time() - $last_update <= $interval) {
+	if ($manual || (time() - $last_update <= $interval)) {
 	    # Yes, just do the notification
 	    notify(inet_aton(SSDPADDR), SSDPPORT);
 	} else {
 	    # Get new info from the server
-	    server($server, $serverIp) unless $listen;
+	    server($server, $serverIp) if $server;
 	}
     }
 }
