@@ -122,156 +122,44 @@ foreach my $int (@interfaces) {
        || die "Setting address and interface $int on multicast receive socket: $!\n";
 }
 
-sub respond {
-    my ($addr, $port) = @_;
-    my $to = pack_sockaddr_in($port, $addr);
-    if ((not defined $url) || (not defined $uuid) || $listen) {
-	msgError "Skipping notification";
-	return;
-    }
-
-    # Responses have ST:
+sub build_response {
+    # 'ST', uuid, url, ($interval*10), 'urn:schemas-upnp-org:device:MediaServer:1'
+    my ($type, $uuid, $url, $age, $urn) = @_;
     my $msg = 'NOTIFY * HTTP/1.1' . CRLF
-	. 'ST: upnp:rootdevice' . CRLF
-	. 'USN: uuid:' . $uuid . '::upnp:rootdevice' . CRLF
+	. $type .': ' . ($urn || ('uuid:'.$uuid)) . CRLF
+	. 'USN: uuid:' . $uuid . ($urn ? '::' . $urn : '') . CRLF
 	. 'NTS: ssdp:alive' . CRLF
 	. 'LOCATION: ' . $url . CRLF
 	. 'HOST: 239.255.255.250:1900' . CRLF
 	. 'SERVER: ssdp-fake/' . VERSION . ' DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' . CRLF
-	. 'CACHE-CONTROL: max-age=' . ($interval * 10) . CRLF . CRLF;
-    msgInfo "Sending (".inet_ntoa($addr).":$port):\n", $msg;
-    $sout->send($msg,0,$to) || die "Can't send notify: $!\n";
+	. 'CACHE-CONTROL: max-age=' . $age . CRLF . CRLF;
+    return $msg;
+}
 
-    $msg = 'NOTIFY * HTTP/1.1' . CRLF
-	. 'ST: uuid:' . $uuid . CRLF
-	. 'USN: uuid:' . $uuid . CRLF
-	. 'NTS: ssdp:alive' . CRLF
-	. 'LOCATION: ' . $url . CRLF
-	. 'HOST: 239.255.255.250:1900' . CRLF
-	. 'SERVER: ssdp-fake/' . VERSION . ' DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' . CRLF
-	. 'CACHE-CONTROL: max-age=' . ($interval * 10) . CRLF . CRLF;
-    msgInfo "Sending (".inet_ntoa($addr).":$port):\n", $msg;
-    $sout->send($msg,0,$to) || die "Can't send notify: $!\n";
-
-    $msg = 'NOTIFY * HTTP/1.1' . CRLF
-	. 'ST: urn:schemas-upnp-org:device:MediaServer:1' . CRLF
-	. 'USN: uuid:' . $uuid . '::urn:schemas-upnp-org:device:MediaServer:1' . CRLF
-	. 'NTS: ssdp:alive' . CRLF
-	. 'LOCATION: ' . $url . CRLF
-	. 'HOST: 239.255.255.250:1900' . CRLF
-	. 'SERVER: ssdp-fake/' . VERSION . ' DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' . CRLF
-	. 'CACHE-CONTROL: max-age=' . ($interval * 10) . CRLF . CRLF;
-    msgInfo "Sending (".inet_ntoa($addr).":$port):\n", $msg;
-    $sout->send($msg,0,$to) || die "Can't send notify: $!\n";
-
-    $msg = 'NOTIFY * HTTP/1.1' . CRLF
-	. 'ST: urn:schemas-upnp-org:service:ContentDirectory:1' . CRLF
-	. 'USN: uuid:' . $uuid . '::urn:schemas-upnp-org:service:ContentDirectory:1' . CRLF
-	. 'NTS: ssdp:alive' . CRLF
-	. 'LOCATION: ' . $url . CRLF
-	. 'HOST: 239.255.255.250:1900' . CRLF
-	. 'SERVER: ssdp-fake/' . VERSION . ' DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' . CRLF
-	. 'CACHE-CONTROL: max-age=' . ($interval * 10) . CRLF . CRLF;
-    print "Sending (".inet_ntoa($addr).":$port):\n", $msg;
-    $sout->send($msg,0,$to) || die "Can't send notify: $!\n";
-
-    $msg = 'NOTIFY * HTTP/1.1' . CRLF
-	. 'ST: urn:schemas-upnp-org:service:ConnectionManager:1' . CRLF
-	. 'USN: uuid:' . $uuid . '::urn:schemas-upnp-org:service:ConnectionManager:1' . CRLF
-	. 'NTS: ssdp:alive' . CRLF
-	. 'LOCATION: ' . $url . CRLF
-	. 'HOST: 239.255.255.250:1900' . CRLF
-	. 'SERVER: ssdp-fake/' . VERSION . ' DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' . CRLF
-	. 'CACHE-CONTROL: max-age=' . ($interval * 10) . CRLF . CRLF;
-    msgInfo "Sending (".inet_ntoa($addr).":$port):\n", $msg;
-    $sout->send($msg,0,$to) || die "Can't send notify: $!\n";
-
-    $msg = 'NOTIFY * HTTP/1.1' . CRLF
-	. 'ST: urn:schemas-upnp-org:service:X_MS_MediaReceiverRegistrar:1' . CRLF
-	. 'USN: uuid:' . $uuid . '::urn:schemas-upnp-org:service:X_MS_MediaReceiverRegistrar:1' . CRLF
-	. 'NTS: ssdp:alive' . CRLF
-	. 'LOCATION: ' . $url . CRLF
-	. 'HOST: 239.255.255.250:1900' . CRLF
-	. 'SERVER: ssdp-fake/' . VERSION . ' DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' . CRLF
-	. 'CACHE-CONTROL: max-age=' . ($interval * 10) . CRLF . CRLF;
+sub send_response {
+    # address, port, 'ST', uuid, url, ($interval*10), 'urn:schemas-upnp-org:device:MediaServer:1'
+    my ($addr, $port, $type, $uuid, $url, $age, $urn) = @_;
+    my $to = pack_sockaddr_in($port, $addr);
+    
+    my $msg = build_response($type, $uuid, $url, $age, $urn);
     msgInfo "Sending (".inet_ntoa($addr).":$port):\n", $msg;
     $sout->send($msg,0,$to) || die "Can't send notify: $!\n";
 }
 
 sub notify {
-    my ($addr, $port) = @_;
-    my $to = pack_sockaddr_in($port, $addr);
+    my ($type, $addr, $port) = @_;
     if ((not defined $url) || (not defined $uuid) || $listen) {
-	msgError "Skipping notification\n";
+	msgError "Skipping $type notification\n";
 	return;
     }
 
-    # Notifies have NT:
-    my $msg = 'NOTIFY * HTTP/1.1' . CRLF
-	. 'NT: upnp:rootdevice' . CRLF
-	. 'USN: uuid:' . $uuid . '::upnp:rootdevice' . CRLF
-	. 'NTS: ssdp:alive' . CRLF
-	. 'LOCATION: ' . $url . CRLF
-	. 'HOST: 239.255.255.250:1900' . CRLF
-	. 'SERVER: ssdp-fake/' . VERSION . ' DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' . CRLF
-	. 'CACHE-CONTROL: max-age=' . ($interval * 10) . CRLF . CRLF;
-    msgInfo "Sending (".inet_ntoa($addr).":$port):\n", $msg;
-    $sout->send($msg,0,$to) || die "Can't send notify: $!\n";
-
-    $msg = 'NOTIFY * HTTP/1.1' . CRLF
-	. 'NT: uuid:' . $uuid . CRLF
-	. 'USN: uuid:' . $uuid . CRLF
-	. 'NTS: ssdp:alive' . CRLF
-	. 'LOCATION: ' . $url . CRLF
-	. 'HOST: 239.255.255.250:1900' . CRLF
-	. 'SERVER: ssdp-fake/' . VERSION . ' DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' . CRLF
-	. 'CACHE-CONTROL: max-age=' . ($interval * 10) . CRLF . CRLF;
-    msgInfo "Sending (".inet_ntoa($addr).":$port):\n", $msg;
-    $sout->send($msg,0,$to) || die "Can't send notify: $!\n";
-
-    $msg = 'NOTIFY * HTTP/1.1' . CRLF
-	. 'NT: urn:schemas-upnp-org:device:MediaServer:1' . CRLF
-	. 'USN: uuid:' . $uuid . '::urn:schemas-upnp-org:device:MediaServer:1' . CRLF
-	. 'NTS: ssdp:alive' . CRLF
-	. 'LOCATION: ' . $url . CRLF
-	. 'HOST: 239.255.255.250:1900' . CRLF
-	. 'SERVER: ssdp-fake/' . VERSION . ' DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' . CRLF
-	. 'CACHE-CONTROL: max-age=' . ($interval * 10) . CRLF . CRLF;
-    msgInfo "Sending (".inet_ntoa($addr).":$port):\n", $msg;
-    $sout->send($msg,0,$to) || die "Can't send notify: $!\n";
-
-    $msg = 'NOTIFY * HTTP/1.1' . CRLF
-	. 'NT: urn:schemas-upnp-org:service:ContentDirectory:1' . CRLF
-	. 'USN: uuid:' . $uuid . '::urn:schemas-upnp-org:service:ContentDirectory:1' . CRLF
-	. 'NTS: ssdp:alive' . CRLF
-	. 'LOCATION: ' . $url . CRLF
-	. 'HOST: 239.255.255.250:1900' . CRLF
-	. 'SERVER: ssdp-fake/' . VERSION . ' DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' . CRLF
-	. 'CACHE-CONTROL: max-age=' . ($interval * 10) . CRLF . CRLF;
-    msgInfo "Sending (".inet_ntoa($addr).":$port):\n", $msg;
-    $sout->send($msg,0,$to) || die "Can't send notify: $!\n";
-
-    $msg = 'NOTIFY * HTTP/1.1' . CRLF
-	. 'NT: urn:schemas-upnp-org:service:ConnectionManager:1' . CRLF
-	. 'USN: uuid:' . $uuid . '::urn:schemas-upnp-org:service:ConnectionManager:1' . CRLF
-	. 'NTS: ssdp:alive' . CRLF
-	. 'LOCATION: ' . $url . CRLF
-	. 'HOST: 239.255.255.250:1900' . CRLF
-	. 'SERVER: ssdp-fake/' . VERSION . ' DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' . CRLF
-	. 'CACHE-CONTROL: max-age=' . ($interval * 10) . CRLF . CRLF;
-    msgInfo "Sending (".inet_ntoa($addr).":$port):\n", $msg;
-    $sout->send($msg,0,$to) || die "Can't send notify: $!\n";
-
-    $msg = 'NOTIFY * HTTP/1.1' . CRLF
-	. 'NT: urn:schemas-upnp-org:service:X_MS_MediaReceiverRegistrar:1' . CRLF
-	. 'USN: uuid:' . $uuid . '::urn:schemas-upnp-org:service:X_MS_MediaReceiverRegistrar:1' . CRLF
-	. 'NTS: ssdp:alive' . CRLF
-	. 'LOCATION: ' . $url . CRLF
-	. 'HOST: 239.255.255.250:1900' . CRLF
-	. 'SERVER: ssdp-fake/' . VERSION . ' DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' . CRLF
-	. 'CACHE-CONTROL: max-age=' . ($interval * 10) . CRLF . CRLF;
-    msgInfo "Sending (".inet_ntoa($addr).":$port):\n", $msg;
-    $sout->send($msg,0,$to) || die "Can't send notify: $!\n";
+    # $type is NT or ST
+    send_response($addr, $port, $type, $uuid, $url, ($interval*10), 'upnp:rootdevice');
+    send_response($addr, $port, $type, $uuid, $url, ($interval*10), '');
+    send_response($addr, $port, $type, $uuid, $url, ($interval*10), 'urn:schemas-upnp-org:device:MediaServer:1');
+    send_response($addr, $port, $type, $uuid, $url, ($interval*10), 'urn:schemas-upnp-org:service:ContentDirectory:1');
+    send_response($addr, $port, $type, $uuid, $url, ($interval*10), 'urn:schemas-upnp-org:service:ConnectionManager:1');
+    send_response($addr, $port, $type, $uuid, $url, ($interval*10), 'urn:schemas-upnp-org:service:X_MS_MediaReceiverRegistrar:1');
 }
 
 sub server {
@@ -336,7 +224,7 @@ while (1) {
 		($port, $addr) = unpack_sockaddr_in($from);
 		msgInfo "Received unicast from " . inet_ntoa($addr) . ":$port: $data";
 		if (is_search($data)) {
-		    respond($addr, $port);
+		    notify('ST', $addr, $port);
 		} else {
 		    parse_msg($data);
 		}
@@ -362,7 +250,7 @@ while (1) {
 		    msgProgress "Ignored multicast from ourselves (".inet_ntoa($addr).":$port)";
 		} else {
 		    msgProgress "Received multicast from ".inet_ntoa($addr).":$port\n", $data;
-		    respond($addr, $port) if is_search($data);
+		    notify('ST', $addr, $port) if is_search($data);
 		}
 	    }
 	}
@@ -372,7 +260,7 @@ while (1) {
 	# Has the server info been updated recently?
 	if ($manual || (time() - $last_update <= $interval)) {
 	    # Yes, just do the notification
-	    notify(inet_aton(SSDPADDR), SSDPPORT);
+	    notify('NT', inet_aton(SSDPADDR), SSDPPORT);
 	} else {
 	    # Get new info from the server
 	    server($server, $serverIp) if $server;
