@@ -28,7 +28,7 @@ the dates to see if that is still true when you read this!
 ### Perl version
 
 ```
-ssdp-fake --listen-only
+ssdp-fake --listen-only [--interface <ifname-or-ip-address>]... [--ignore <ip-address>]...
 
 ssdp-fake [--interface <ifname-or-ip-address>]... [--timer N] servername-or-address
 
@@ -89,7 +89,7 @@ Python multicast code taken from Stack Overflow (https://stackoverflow.com/quest
 Other example code taken from Stack Overflow by Toddeman, however it does not seem to be available any longer
 
 ## Notices
-Copyright (c) 2014-2017 Graham R. Cobb.
+Copyright (c) 2014-2020 Graham R. Cobb.
 This software is distributed under the GPL (see the copyright notices and the LICENSE file).
 
 `ssdp-fake` is free software; you can redistribute it and/or modify

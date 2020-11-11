@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-# Copyright (C) 2014-2017 Graham R. Cobb
+# Copyright (C) 2014-2020 Graham R. Cobb
 # Released under GPL V2 -- see LICENSE
 # Not sure where I got the original for this from.  If you know please tell me.
 use strict;
@@ -9,7 +9,7 @@ use Getopt::Long 2.33 qw(:config gnu_getopt auto_help auto_version);
 #use Pod::Usage;
 use List::Util qw[max];
 
-use constant VERSION => '0.4';
+use constant VERSION => '0.5';
 
 use constant SSDPADDR => '239.255.255.250';
 use constant SSDPPORT => 1900;
@@ -54,16 +54,18 @@ my $manual = 0;
 my $listen = 0;
 my $interval = 60;
 my @interfaces = ();
+my @ignores = ();
 my $man = 0;
 #Getopt::Long::Configure ("bundling");
 if (!GetOptions(
-	   "listen-only|l" => \$listen,
-	   "timer|t=i" => \$interval,
-	   "interface|i=s" => \@interfaces,
-	   "verbose|v:+" => \$verbosity,
-	   "man" => \$man,
-	   )) {
-    msgError("Usage: ssdp-fake [--listen-only] [--timer=<seconds>] [--interface=<address>]... [--verbose]... <server-host> | <url> <uuid>");
+	 "listen-only|l" => \$listen,
+	 "timer|t=i" => \$interval,
+	 "interface|i=s" => \@interfaces,
+	 "ignore|i=s" => \@ignores,
+	 "verbose|v:+" => \$verbosity,
+	 "man" => \$man,
+    )) {
+    msgError("Usage: ssdp-fake [--listen-only] [--timer=<seconds>] [--interface=<address>]... [--verbose]... [--ignore=<address>[:port]]... <server-host> | <url> <uuid>");
     exit;
 }
 msgDebug "man = $man";
@@ -91,6 +93,7 @@ msgDebug "listen = $listen";
 msgDebug "manual = $manual";
 msgDebug "interval = $interval";
 msgDebug "interaces = @interfaces";
+msgDebug "ignores = @ignores";
 
 
 # Multicast sending socket
@@ -344,7 +347,18 @@ while (1) {
 	    $from = $sinm->recv($data, 4096);
 	    if (defined($from)) {
 		($port, $addr) = unpack_sockaddr_in($from);
-		if ($port == $myport) {
+		if (
+		     grep {
+			my ($ignore_addr, $ignore_port);
+			($ignore_addr, $ignore_port) = split ':';
+			(
+			 ((! $ignore_addr) || ($ignore_addr eq inet_ntoa($addr)))
+			 && ((! $ignore_port) || ($ignore_port == $port))
+			)
+		     } @ignores
+		    ) {
+		    msgProgress "Ignoring multicast from ".inet_ntoa($addr).":$port";
+		} elsif ($port == $myport) {
 		    msgProgress "Ignored multicast from ourselves (".inet_ntoa($addr).":$port)";
 		} else {
 		    msgProgress "Received multicast from ".inet_ntoa($addr).":$port\n", $data;
