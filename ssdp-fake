@@ -55,17 +55,19 @@ my $listen = 0;
 my $interval = 60;
 my @interfaces = ();
 my @ignores = ();
+my @onlys = ();
 my $man = 0;
 #Getopt::Long::Configure ("bundling");
 if (!GetOptions(
 	 "listen-only|l" => \$listen,
 	 "timer|t=i" => \$interval,
 	 "interface|i=s" => \@interfaces,
+	 "only|i=s" => \@onlys,
 	 "ignore|i=s" => \@ignores,
 	 "verbose|v:+" => \$verbosity,
 	 "man" => \$man,
     )) {
-    msgError("Usage: ssdp-fake [--listen-only] [--timer=<seconds>] [--interface=<address>]... [--verbose]... [--ignore=<address>[:port]]... <server-host> | <url> <uuid>");
+    msgError("Usage: ssdp-fake [--listen-only] [--timer=<seconds>] [--interface=<address>]... [--verbose]... [--ignore=<address>]... [--only=<address>]... <server-host> | <url> <uuid>");
     exit;
 }
 msgDebug "man = $man";
@@ -94,6 +96,7 @@ msgDebug "manual = $manual";
 msgDebug "interval = $interval";
 msgDebug "interaces = @interfaces";
 msgDebug "ignores = @ignores";
+msgDebug "onlys = @onlys";
 
 
 # Multicast sending socket
@@ -235,7 +238,17 @@ while (1) {
 	    $from = $sinm->recv($data, 4096);
 	    if (defined($from)) {
 		($port, $addr) = unpack_sockaddr_in($from);
-		if (
+		if ( @onlys && ! grep {
+			my ($only_addr, $only_port);
+			($only_addr, $only_port) = split ':';
+			(
+			 ((! $only_addr) || ($only_addr eq inet_ntoa($addr)))
+			 && ((! $only_port) || ($only_port == $port))
+			)
+		     } @onlys
+		    ) {
+		    msgProgress "Ignoring multicast from ".inet_ntoa($addr).":$port";
+		} elsif (
 		     grep {
 			my ($ignore_addr, $ignore_port);
 			($ignore_addr, $ignore_port) = split ':';
