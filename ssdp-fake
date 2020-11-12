@@ -52,6 +52,8 @@ $| = 1;
 #
 my $manual = 0;
 my $listen = 0;
+my $media_server = 0;
+my $media_renderer = 0;
 my $interval = 60;
 my @interfaces = ();
 my @ignores = ();
@@ -60,14 +62,16 @@ my $man = 0;
 #Getopt::Long::Configure ("bundling");
 if (!GetOptions(
 	 "listen-only|l" => \$listen,
+	 "media-server|m" => \$media_server,
+	 "renderer|r" => \$media_renderer,
 	 "timer|t=i" => \$interval,
 	 "interface|i=s" => \@interfaces,
-	 "only|i=s" => \@onlys,
-	 "ignore|i=s" => \@ignores,
+	 "only|o=s" => \@onlys,
+	 "ignore|n=s" => \@ignores,
 	 "verbose|v:+" => \$verbosity,
 	 "man" => \$man,
     )) {
-    msgError("Usage: ssdp-fake [--listen-only] [--timer=<seconds>] [--interface=<address>]... [--verbose]... [--ignore=<address>]... [--only=<address>]... <server-host> | <url> <uuid>");
+    msgError("Usage: ssdp-fake [--listen-only] [--timer=<seconds>] [--interface=<address>]... [--verbose]... [--ignore=<address>]... [--only=<address>]... [--media-server] [--renderer] <server-host> | <url> <uuid>");
     exit;
 }
 msgDebug "man = $man";
@@ -75,6 +79,8 @@ msgDebug "man = $man";
 #    pod2usage(-verbose => 2);
 #    exit;
 #}
+# Default system type is media server
+if ((!$media_server) & (!$media_renderer)) {$media_server=1;}
 if (! $listen) {
     if (@ARGV > 1) {
 	# Information manually configured
@@ -87,6 +93,8 @@ if (! $listen) {
 }
 
 msgDebug "verbosity = $verbosity";
+msgDebug "media_server = $media_server";
+msgDebug "media_renderer = $media_renderer";
 msgDebug "server = ", $server ? $server : '';
 msgDebug "serverIP = ", $serverIp ? inet_ntoa($serverIp) : '';
 msgDebug "url = ", $url ? $url : ''; 
@@ -133,6 +141,8 @@ sub build_response {
 	. 'USN: uuid:' . $uuid . ($urn ? '::' . $urn : '') . CRLF
 	. 'NTS: ssdp:alive' . CRLF
 	. 'LOCATION: ' . $url . CRLF
+	. 'OPT: "http://schemas.upnp.org/upnp/1/0/"; ns=01' . CRLF
+	. '01-NLS: uuid:' . $uuid . CRLF
 	. 'HOST: 239.255.255.250:1900' . CRLF
 	. 'SERVER: ssdp-fake/' . VERSION . ' DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' . CRLF
 	. 'CACHE-CONTROL: max-age=' . $age . CRLF . CRLF;
@@ -150,6 +160,11 @@ sub send_response {
 }
 
 sub notify {
+    notify_media_server(@_) if ($media_server);
+    notify_media_renderer(@_) if ($media_renderer);
+}
+
+sub notify_media_server {
     my ($type, $addr, $port) = @_;
     if ((not defined $url) || (not defined $uuid) || $listen) {
 	msgError "Skipping $type notification\n";
@@ -163,6 +178,29 @@ sub notify {
     send_response($addr, $port, $type, $uuid, $url, ($interval*10), 'urn:schemas-upnp-org:service:ContentDirectory:1');
     send_response($addr, $port, $type, $uuid, $url, ($interval*10), 'urn:schemas-upnp-org:service:ConnectionManager:1');
     send_response($addr, $port, $type, $uuid, $url, ($interval*10), 'urn:schemas-upnp-org:service:X_MS_MediaReceiverRegistrar:1');
+}
+
+sub notify_media_renderer {
+    my ($type, $addr, $port) = @_;
+    if ((not defined $url) || (not defined $uuid) || $listen) {
+	msgError "Skipping renderer $type notification\n";
+	return;
+    }
+
+    # $type is NT or ST
+    send_response($addr, $port, $type, $uuid, $url, ($interval*10), 'upnp:rootdevice');
+    send_response($addr, $port, $type, $uuid, $url, ($interval*10), '');
+    send_response($addr, $port, $type, $uuid, $url, ($interval*10), 'urn:schemas-upnp-org:device:MediaRenderer:1');
+    send_response($addr, $port, $type, $uuid, $url, ($interval*10), 'urn:schemas-upnp-org:service:AVTransport:1');
+    send_response($addr, $port, $type, $uuid, $url, ($interval*10), 'urn:schemas-upnp-org:service:RenderingControl:1');
+    send_response($addr, $port, $type, $uuid, $url, ($interval*10), 'urn:schemas-upnp-org:service:ConnectionManager:1');
+    send_response($addr, $port, $type, $uuid, $url, ($interval*10), 'urn:av-openhome-org:service:Info:1');
+    send_response($addr, $port, $type, $uuid, $url, ($interval*10), 'urn:av-openhome-org:service:Time:1');
+    send_response($addr, $port, $type, $uuid, $url, ($interval*10), 'urn:av-openhome-org:service:Volume:1');
+    send_response($addr, $port, $type, $uuid, $url, ($interval*10), 'urn:av-openhome-org:service:Credentials:1');
+    send_response($addr, $port, $type, $uuid, $url, ($interval*10), 'urn:av-openhome-org:service:Playlist:1');
+    send_response($addr, $port, $type, $uuid, $url, ($interval*10), 'urn:av-openhome-org:service:Radio:1');
+    send_response($addr, $port, $type, $uuid, $url, ($interval*10), 'urn:av-openhome-org:service:Product:2');
 }
 
 sub server {
@@ -238,7 +276,7 @@ while (1) {
 	    $from = $sinm->recv($data, 4096);
 	    if (defined($from)) {
 		($port, $addr) = unpack_sockaddr_in($from);
-		if ( @onlys && ! grep {
+		if ( scalar(@onlys) && ! grep {
 			my ($only_addr, $only_port);
 			($only_addr, $only_port) = split ':';
 			(
