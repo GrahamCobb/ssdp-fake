@@ -80,9 +80,9 @@ msgDebug "man = $man";
 #    exit;
 #}
 # Default system type is media server
-if ((!$media_server) & (!$media_renderer)) {$media_server=1;}
+$media_server=1 if ! $media_renderer;
 if (! $listen) {
-    if (@ARGV > 1) {
+    if (scalar(@ARGV) > 1) {
 	# Information manually configured
 	($url, $uuid) = @ARGV;
 	$manual = 1;
@@ -133,6 +133,11 @@ foreach my $int (@interfaces) {
        || die "Setting address and interface $int on multicast receive socket: $!\n";
 }
 
+# Server request socket (unicast)
+my $sinsrvr = IO::Socket::INET->new(Proto => 'udp',
+            ReuseAddr => 1)
+       || die "Can't make server socket: $!\n";
+
 sub build_response {
     # 'ST', uuid, url, ($interval*10), 'urn:schemas-upnp-org:device:MediaServer:1'
     my ($type, $uuid, $url, $age, $urn) = @_;
@@ -149,6 +154,7 @@ sub build_response {
     return $msg;
 }
 
+my $myport;
 sub send_response {
     # address, port, 'ST', uuid, url, ($interval*10), 'urn:schemas-upnp-org:device:MediaServer:1'
     my ($addr, $port, $type, $uuid, $url, $age, $urn) = @_;
@@ -157,6 +163,13 @@ sub send_response {
     my $msg = build_response($type, $uuid, $url, $age, $urn);
     msgInfo "Sending (".inet_ntoa($addr).":$port):\n", $msg;
     $sout->send($msg,0,$to) || die "Can't send notify: $!\n";
+
+    # Note: our sending port is not assigned until at least one send has happened
+    if (!$myport) {
+	my $mysock = $sout->sockname;
+	($myport) = unpack_sockaddr_in($mysock);
+	msgDebug "My port is $myport";
+    }
 }
 
 sub notify {
@@ -166,15 +179,21 @@ sub notify {
 
 sub notify_media_server {
     my ($type, $addr, $port) = @_;
-    if ((not defined $url) || (not defined $uuid) || $listen) {
+    if ($listen) {
+	msgProgress "Skipping $type notification\n";
+	return;
+    }
+    if ((not defined $url) || (not defined $uuid)) {
 	msgError "Skipping $type notification\n";
 	return;
     }
 
     # $type is NT or ST
+    # Root device 
     send_response($addr, $port, $type, $uuid, $url, ($interval*10), 'upnp:rootdevice');
     send_response($addr, $port, $type, $uuid, $url, ($interval*10), '');
     send_response($addr, $port, $type, $uuid, $url, ($interval*10), 'urn:schemas-upnp-org:device:MediaServer:1');
+    # Services
     send_response($addr, $port, $type, $uuid, $url, ($interval*10), 'urn:schemas-upnp-org:service:ContentDirectory:1');
     send_response($addr, $port, $type, $uuid, $url, ($interval*10), 'urn:schemas-upnp-org:service:ConnectionManager:1');
     send_response($addr, $port, $type, $uuid, $url, ($interval*10), 'urn:schemas-upnp-org:service:X_MS_MediaReceiverRegistrar:1');
@@ -182,15 +201,21 @@ sub notify_media_server {
 
 sub notify_media_renderer {
     my ($type, $addr, $port) = @_;
-    if ((not defined $url) || (not defined $uuid) || $listen) {
+    if ($listen) {
+	msgProgress "Skipping renderer $type notification\n";
+	return;
+    }
+    if ((not defined $url) || (not defined $uuid)) {
 	msgError "Skipping renderer $type notification\n";
 	return;
     }
 
     # $type is NT or ST
+    # Root device 
     send_response($addr, $port, $type, $uuid, $url, ($interval*10), 'upnp:rootdevice');
     send_response($addr, $port, $type, $uuid, $url, ($interval*10), '');
     send_response($addr, $port, $type, $uuid, $url, ($interval*10), 'urn:schemas-upnp-org:device:MediaRenderer:1');
+    # Services
     send_response($addr, $port, $type, $uuid, $url, ($interval*10), 'urn:schemas-upnp-org:service:AVTransport:1');
     send_response($addr, $port, $type, $uuid, $url, ($interval*10), 'urn:schemas-upnp-org:service:RenderingControl:1');
     send_response($addr, $port, $type, $uuid, $url, ($interval*10), 'urn:schemas-upnp-org:service:ConnectionManager:1');
@@ -213,7 +238,7 @@ sub server {
 	. 'User-Agent: ssdp-fake/' . VERSION . ' DLNADOC/1.50 UPnP/1.0 ssdp-fake/0' . CRLF . CRLF;
     msgInfo "Sending to server $server:\n", $msg;
     my $to = pack_sockaddr_in(SSDPPORT, $serverIp);
-    $sout->send($msg, 0, $to) || die "Can't send server request: $!\n";
+    $sinsrvr->send($msg, 0, $to) || die "Can't send server request: $!\n";
 }
 
 sub parse_msg {
@@ -240,12 +265,8 @@ server($server, $serverIp) if $server;
 
 $next_notification = time() + $interval;
 
-# Note: our sending port is not assigned until at least one send has happened
-my $mysock = $sout->sockname;
-my ($myport) = unpack_sockaddr_in($mysock);
-msgDebug "My port is $myport";
-
 # Unicast receive socket
+dir "sending port number not set" if !$myport;
 my $sin = IO::Socket::INET->new(Proto => 'udp',
             LocalPort => $myport,
             ReuseAddr => 1)
@@ -254,11 +275,12 @@ my $sin = IO::Socket::INET->new(Proto => 'udp',
 my $sel = IO::Select->new;
 $sel->add($sin);
 $sel->add($sinm);
+$sel->add($sinsrvr) if $sinsrvr;
 
 while (1) {
     my @ready = $sel->can_read(max($next_notification - time(), 0));
     foreach my $fh (@ready) {
-	if($fh == $sin) {
+	if ($fh == $sin) {
 	    my ($data, $from, $addr, $port);
 	    $from = $sin->recv($data, 4096);
 	    if (defined($from)) {
@@ -270,8 +292,7 @@ while (1) {
 		    parse_msg($data);
 		}
 	    }
-	}
-	if($fh == $sinm) {
+	} elsif ($fh == $sinm) {
 	    my ($data, $from, $addr, $port);
 	    $from = $sinm->recv($data, 4096);
 	    if (defined($from)) {
@@ -303,6 +324,14 @@ while (1) {
 		    msgProgress "Received multicast from ".inet_ntoa($addr).":$port\n", $data;
 		    notify('ST', $addr, $port) if is_search($data);
 		}
+	    }
+	} elsif ($fh == $sinsrvr) {
+	    my ($data, $from, $addr, $port);
+	    $from = $sinsrvr->recv($data, 4096);
+	    if (defined($from)) {
+		($port, $addr) = unpack_sockaddr_in($from);
+		msgInfo "Received server response from " . inet_ntoa($addr) . ":$port: $data";
+		parse_msg($data);
 	    }
 	}
     }
