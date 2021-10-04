@@ -266,7 +266,7 @@ server($server, $serverIp) if $server;
 $next_notification = time() + $interval;
 
 # Unicast receive socket
-dir "sending port number not set" if !$myport;
+die "sending port number not set" if !$myport;
 my $sin = IO::Socket::INET->new(Proto => 'udp',
             LocalPort => $myport,
             ReuseAddr => 1)
